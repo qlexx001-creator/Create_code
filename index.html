@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>สร้างป้ายรหัสสินค้า</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { 
+            --primary: #4f46e5; 
+            --primary-hover: #4338ca;
+            --success: #10b981; 
+            --accent: #1e293b;
+            --bg-ui: #f1f5f9;
+            --card-bg: rgba(255, 255, 255, 0.9);
+        }
+
+        body { 
+            font-family: 'Sarabun', sans-serif; 
+            background: var(--bg-ui); 
+            margin: 0; padding: 20px; 
+            display: flex; flex-direction: column; align-items: center; 
+            color: #334155;
+        }
+
+        .ui-panel { 
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            padding: 30px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            width: 100%; 
+            max-width: 1100px; 
+            margin-bottom: 40px; 
+            border: 1px solid rgba(255,255,255,0.7);
+        }
+
+        .header-title { text-align: center; margin-bottom: 25px; }
+        .header-title h1 { margin: 0; font-size: 24px; color: var(--accent); font-weight: 600; }
+
+        .db-status-box { 
+            display: flex; align-items: center; justify-content: space-between; 
+            background: #fff; border: 1px dashed #cbd5e1; 
+            padding: 15px 25px; border-radius: 12px; margin-bottom: 25px; 
+        }
+
+        .settings-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+            gap: 20px; 
+        }
+
+        .section-box { 
+            background: white; padding: 20px; 
+            border-radius: 15px; border: 1px solid #e2e8f0;
+        }
+
+        .section-title { 
+            font-size: 14px; font-weight: 600; color: var(--primary); 
+            margin-bottom: 15px; display: flex; align-items: center; gap: 8px;
+        }
+
+        .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+        .input-group label { font-size: 12px; font-weight: 600; color: #475569; }
+        
+        .row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        input { 
+            padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; 
+            font-size: 14px; transition: all 0.2s; font-family: inherit;
+        }
+        input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        input[type="color"] { height: 42px; cursor: pointer; padding: 4px; }
+
+        .btn-group-main { display: grid; grid-template-columns: 1.2fr 1fr; gap: 15px; margin-top: 30px; }
+        
+        button { 
+            padding: 16px; font-size: 16px; border-radius: 12px; border: none; 
+            cursor: pointer; font-weight: 600; font-family: inherit;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            transition: all 0.2s;
+        }
+
+        .btn-import { background: var(--accent); color: white; padding: 10px 20px; font-size: 14px; }
+        .btn-gen { background: var(--primary); color: white; }
+        .btn-print { background: var(--success); color: white; }
+
+        #print-content { width: 100%; display: flex; flex-direction: column; align-items: center; }
+        .a4-page { 
+            width: 842pt; height: 595pt; 
+            background: white; padding: 20pt; margin: 0 0 30px 0; 
+            display: grid; align-content: start; page-break-after: always;
+            box-shadow: 0 0 30px rgba(0,0,0,0.05);
+        }
+
+        .tag-box { 
+            position: relative; border: var(--thick) solid #000; 
+            border-radius: var(--rad); padding: 10pt; box-sizing: border-box; 
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+
+        .text-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .text-table td { text-align: center; vertical-align: middle; word-wrap: break-word; line-height: var(--line-height); }
+        .tag-header-text { font-weight: 600; }
+        .tag-sub-text { font-weight: 600; }
+        .tag-number { position: absolute; top: 6pt; right: 8pt; font-size: 8pt; color: #94a3b8; font-weight: bold; }
+        .barcode-container { width: 100%; display: flex; justify-content: center; margin-top: auto; }
+
+        @media print {
+            @page { size: A4 landscape; margin: 0; }
+            body { background: none; padding: 0; margin: 0; }
+            .ui-panel { display: none !important; }
+            .a4-page { box-shadow: none; margin: 0; width: 842pt; height: 595pt; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ui-panel">
+        <div class="header-title">
+            <h1>สร้างป้ายรหัสสินค้า</h1>
+        </div>
+
+        <div class="db-status-box">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div id="dbDot" style="width:12px; height:12px; border-radius:50%; background:#cbd5e1;"></div>
+                <span id="dbText" style="font-size:14px; font-weight: 600;">ยังไม่มีฐานข้อมูล Excel</span>
+            </div>
+            <button class="btn-import" onclick="document.getElementById('fileInput').click()">📁 เลือกไฟล์ Excel</button>
+            <input type="file" id="fileInput" accept=".xlsx, .xls" style="display: none;">
+        </div>
+
+        <div class="input-group" style="margin-bottom: 25px;">
+            <label>📌 รหัสสต็อกที่ต้องการค้นหา</label>
+            <input type="text" id="txtHeader" value="SV-ST-ST-003" style="font-size: 18px; font-weight: 600; color: var(--primary); text-align: center;">
+        </div>
+
+        <div class="settings-grid">
+            <div class="section-box">
+                <div class="section-title"><span>🔠</span> รูปแบบตัวอักษร</div>
+                <div class="row-inputs">
+                    <div class="input-group"><label>ขนาดรหัส (pt)</label><input type="number" id="fHeader" value="16"></div>
+                    <div class="input-group"><label>ขนาดชื่อ (pt)</label><input type="number" id="fSub" value="11"></div>
+                </div>
+                <div class="row-inputs">
+                    <div class="input-group"><label>ความสูงบาร์โค้ด</label><input type="number" id="bcHeight" value="50"></div>
+                    <div class="input-group"><label>สีชื่อรายการ</label><input type="color" id="colorSub" value="#ff0000"></div>
+                </div>
+                <div class="input-group">
+                    <label>↔️ ระยะบรรทัด: <span id="lhV" style="color: var(--primary);">1.2</span></label>
+                    <input type="range" id="lineHeightSlider" min="0.8" max="2.0" step="0.1" value="1.2" oninput="document.getElementById('lhV').innerText = this.value">
+                </div>
+            </div>
+
+            <div class="section-box">
+                <div class="section-title"><span>📏</span> ขนาดและกรอบ (Point)</div>
+                <div class="row-inputs">
+                    <div class="input-group"><label>กว้าง</label><input type="number" id="wVal" value="240"></div>
+                    <div class="input-group"><label>สูง</label><input type="number" id="hVal" value="160"></div>
+                </div>
+                <div class="row-inputs">
+                    <div class="input-group"><label>ระยะห่าง</label><input type="number" id="gapVal" value="10"></div>
+                    <div class="input-group"><label>ความโค้ง</label><input type="number" id="radVal" value="8"></div>
+                </div>
+                <div class="input-group"><label>ความหนาเส้นขอบ (px)</label><input type="number" id="thickVal" value="2"></div>
+            </div>
+
+            <div class="section-box">
+                <div class="section-title"><span>🔢</span> ลำดับและการนับ</div>
+                <div class="row-inputs">
+                    <div class="input-group"><label>เลขเริ่มต้น</label><input type="number" id="startNum" value="1"></div>
+                    <div class="input-group"><label>ระยะห่าง (Step)</label><input type="number" id="stepNum" value="1" min="1"></div>
+                </div>
+                <div class="input-group"><label>จำนวนป้ายที่จะสร้าง</label><input type="number" id="numVal" value="8"></div>
+                <div class="input-group">
+                    <label>📝 หมายเหตุท้ายป้าย</label>
+                    <input type="text" id="txtNote" value="อย่าลืมเขียนใบเบิกนะจั๊ป">
+                </div>
+            </div>
+        </div>
+
+        <div class="btn-group-main">
+            <button class="btn-gen" onclick="renderLookup()">✨ 1. สร้างป้ายพรีวิว</button>
+            <button class="btn-print" onclick="window.print()">🖨️ 2. สั่งพิมพ์ / เซฟ PDF</button>
+        </div>
+    </div>
+
+    <div id="print-content"></div>
+
+    <script>
+        let itemDatabase = {}; 
+
+        window.addEventListener('keydown', (e) => { if (e.key === 'Enter') renderLookup(); });
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const workbook = XLSX.read(evt.target.result, { type: 'binary' });
+                const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+                itemDatabase = {}; 
+                json.forEach(row => { if (row[0]) itemDatabase[String(row[0]).trim()] = String(row[1] || "").trim(); });
+                const dot = document.getElementById('dbDot');
+                dot.style.background = 'var(--success)';
+                dot.style.boxShadow = '0 0 10px var(--success)';
+                document.getElementById('dbText').innerText = `เชื่อมต่อแล้ว (${Object.keys(itemDatabase).length} รายการ)`;
+            };
+            reader.readAsBinaryString(file);
+        });
+
+        function renderLookup() {
+            const fullText = document.getElementById('txtHeader').value.trim();
+            const matchedName = itemDatabase[fullText] || "ไม่พบข้อมูลในระบบ";
+            const parts = fullText.split('-');
+            let barcodePrefix = parts.length >= 2 ? parts.slice(-2).join('-') : fullText;
+
+            const config = {
+                num: parseInt(document.getElementById('numVal').value),
+                start: parseInt(document.getElementById('startNum').value),
+                step: parseInt(document.getElementById('stepNum').value) || 1,
+                bcH: parseInt(document.getElementById('bcHeight').value),
+                fH: document.getElementById('fHeader').value + 'pt',
+                fS: document.getElementById('fSub').value + 'pt',
+                colorS: document.getElementById('colorSub').value,
+                lineH: document.getElementById('lineHeightSlider').value,
+                note: document.getElementById('txtNote').value,
+                w: parseFloat(document.getElementById('wVal').value),
+                h: parseFloat(document.getElementById('hVal').value),
+                gap: parseFloat(document.getElementById('gapVal').value),
+                rad: document.getElementById('radVal').value + 'pt',
+                thick: document.getElementById('thickVal').value + 'px'
+            };
+
+            const container = document.getElementById('print-content');
+            container.innerHTML = '';
+
+            const cols = Math.floor((842 - 40 + config.gap) / (config.w + config.gap));
+            const rows = Math.floor((595 - 40 + config.gap) / (config.h + config.gap));
+            const perPage = Math.max(1, cols * rows);
+
+            let currentSeq = config.start;
+            for (let i = 0; i < config.num; i += perPage) {
+                const page = document.createElement('div');
+                page.className = 'a4-page';
+                page.style.gridTemplateColumns = `repeat(${cols}, ${config.w}pt)`;
+                page.style.gap = `${config.gap}pt`;
+
+                for (let j = 0; j < perPage && (i + j) < config.num; j++) {
+                    const tagId = `bc-${i + j}`;
+                    const tag = document.createElement('div');
+                    tag.className = 'tag-box';
+                    tag.style.width = `${config.w}pt`;
+                    tag.style.height = `${config.h}pt`;
+                    tag.style.setProperty('--rad', config.rad);
+                    tag.style.setProperty('--thick', config.thick);
+                    tag.style.setProperty('--line-height', config.lineH);
+                    
+                    tag.innerHTML = `
+                        <div class="tag-number">#${currentSeq}</div>
+                        <div class="text-section">
+                            <table class="text-table">
+                                <tr><td class="tag-header-text" style="font-size: ${config.fH}">${fullText}</td></tr>
+                                <tr><td class="tag-sub-text" style="font-size: ${config.fS}; color: ${config.colorS}">${matchedName}</td></tr>
+                                <tr><td style="font-size: 8pt; color: #94a3b8; padding-top: 4pt;">${config.note}</td></tr>
+                            </table>
+                        </div>
+                        <div class="barcode-container"><svg id="${tagId}"></svg></div>
+                    `;
+                    page.appendChild(tag);
+                    
+                    const finalVal = `${barcodePrefix}-${currentSeq}`;
+                    const tid = tagId;
+                    setTimeout(() => {
+                        JsBarcode(`#${tid}`, finalVal, {
+                            format: "CODE128", width: 2, height: config.bcH, displayValue: true, fontSize: 13, margin: 0, font: 'Sarabun'
+                        });
+                    }, 0);
+                    currentSeq += config.step;
+                }
+                container.appendChild(page);
+            }
+        }
+    </script>
+</body>
+</html>
